@@ -59,20 +59,20 @@ O vinculador geralmente faz um pouco mais do que isso. Por exemplo, ele pode ger
 
 Para obter mais informações sobre o vinculador, há um ótimo tópico em [Stack Overflow](https://stackoverflow.com/questions/3322911/what-do-linkers-do).
 
-Anatomy of a Linker Script[](#anatomy-of-a-linker-script)
----------------------------------------------------------
+Anatomia de um **Script de Ligação**
+-------------------------------------------------- -------
 
-A linker script contains four things:
+Um **script de ligação** contém quatro coisas:
 
-*   Memory layout: what memory is available where
-*   Section definitions: what part of a program should go where
-*   Options: commands to specify architecture, entry point, …etc. if needed
-*   Symbols: variables to inject into the program at link time
+* Layout de memória: qual memória está disponível e onde
+* Definições de seção: que parte de um programa deve ir para onde
+* Opções: comandos para especificar arquitetura, ponto de entrada, etc. se necessário
+* Símbolos: variáveis para injetar no programa na hora do link
 
-Memory Layout[](#memory-layout)
+## Layout de memória
 -------------------------------
 
-In order to allocate program space, the linker needs to know how much memory is available, and at what addresses that memory exists. This is what the `MEMORY` definition in the linker script is for.
+In order to allocate program space, the linker needs to know how much memory is available, and at what addresses that memory exists. This is what the `MEMORY` definition in the **script de ligação** is for.
 
 The syntax for MEMORY is defined in the [binutils docs](https://sourceware.org/binutils/docs/ld/MEMORY.html#MEMORY) and is as follow:
 
@@ -123,7 +123,7 @@ Transcribed into a `MEMORY` definition, this gives us:
     }
     
 
-Section Definitions[](#section-definitions)
+## Section Definitions
 -------------------------------------------
 
 Code and data are bucketed into sections, which are contiguous areas of memory. There are no hard rules about how many sections you should have, or what they should be, but you typically want to put symbols in the same section if:
@@ -136,7 +136,7 @@ In our previous post, we learned about two types of symbols that are initialized
 1.  Initialized static variables which must be copied from flash
 2.  Uninitialized static variables which must be zeroed.
 
-Our linker script concerns itself with two more things:
+Our **script de ligação** concerns itself with two more things:
 
 1.  Code and constant data, which can live in read-only memory (e.g. flash)
 2.  Reserved sections of RAM, like a stack or a heap
@@ -150,7 +150,7 @@ By convention, we name those sections as follow:
 
 The [elf spec](http://refspecs.linuxbase.org/elf/elf.pdf) holds a full list. Your firmware will work just fine if you call them anything else, but your colleagues may be confused and some tools may fail in odd ways. The only constraint is that you may not call your section `/DISCARD/`, which is a reserved keyword.
 
-First, let’s look at what happens to our symbols if we do not define any of those sections in the linker script.
+First, let’s look at what happens to our symbols if we do not define any of those sections in the **script de ligação**.
 
     MEMORY
     {
@@ -230,7 +230,7 @@ To find out what sections are in our object file, we can once again use `objdump
 
 We see that each of our symbol has a section. This is due to the fact that we compiled our firmware with the `-ffunction-sections` and `-fdata-sections` flags. Had we not included them, the compiler would have been free to merge several functions into a single `text.<some identifier>` section.
 
-To put all of our functions in the `.text` section in our linker script, we use the following syntax: `<filename>(<section>)`, where `filename` is the name of the input files whose symbols we want to include, and `section` is the name of the input sections. Since we want all `.text...` sections in all files, we use the wildcard `*`:
+To put all of our functions in the `.text` section in our **script de ligação**, we use the following syntax: `<filename>(<section>)`, where `filename` is the name of the input files whose symbols we want to include, and `section` is the name of the input sections. Since we want all `.text...` sections in all files, we use the wildcard `*`:
 
     .text :
     {
@@ -284,7 +284,7 @@ Now, let’s take care of our `.bss`. Remember, this is the section we put unini
 
 You’ll note that the `.bss` section also includes `*(COMMON)`. This is a special input section where the compiler puts global uninitialized variables that go beyond file scope. `int foo;` goes there, while `static int foo;` does not. This allows the linker to merge multiple definitions into one symbol if they have the same name.
 
-We indicate that this section is not loaded with the `NOLOAD` property. This is the only section property used in modern linker scripts.
+We indicate that this section is not loaded with the `NOLOAD` property. This is the only section property used in modern **script de ligação**s.
 
 ### `.stack` Section[](#stack-section)
 
@@ -314,7 +314,7 @@ Only one more section to go!
 
 The `.data` section contains static variables which have an initial value at boot. You will remember from our previous article that since RAM isn’t persisted while power is off, those sections need to be loaded from flash. At boot, the `Reset_Handler` copies the data from flash to RAM before the `main` function is called.
 
-To make this possible, every section in our linker script has two addresses, its _load_ address (LMA) and its _virtual_ address (VMA). In a firmware context, the LMA is where your JTAG loader needs to place the section and the VMA is where the section is found during execution.
+To make this possible, every section in our **script de ligação** has two addresses, its _load_ address (LMA) and its _virtual_ address (VMA). In a firmware context, the LMA is where your JTAG loader needs to place the section and the VMA is where the section is found during execution.
 
 You can think of the LMA as the address “at rest” and the VMA the address during execution i.e. when the device is on and the program is running.
 
@@ -340,9 +340,9 @@ Note that instead of appending a section to a memory region, you could also expl
 
 Where `ORIGIN(<region>)` is a simple way to specify the start of a region. You can enter an address in hex as well.
 
-And we’re done! Here’s our complete linker script with every section:
+And we’re done! Here’s our complete **script de ligação** with every section:
 
-### Complete Linker Script[](#complete-linker-script)
+### Complete **script de ligação**[](#complete-linker-script)
 
     MEMORY
     {
@@ -386,9 +386,9 @@ And we’re done! Here’s our complete linker script with every section:
     }
     
 
-You can find the full details on linker script sections syntax in the [ld manual](https://sourceware.org/binutils/docs/ld/SECTIONS.html#SECTIONS).
+You can find the full details on **script de ligação** sections syntax in the [ld manual](https://sourceware.org/binutils/docs/ld/SECTIONS.html#SECTIONS).
 
-Variables[](#variables)
+## Variables
 -----------------------
 
 In the first post, our `ResetHandler` relied on seemingly magic variables to know the address of each of our sections of memory. It turns out, those variable came
@@ -440,10 +440,10 @@ One quirk of these linker-provided symbols: you must use a reference to them, ne
 
 You can read more details about this in the [binutils docs](https://sourceware.org/binutils/docs/ld/Source-Code-Reference.html).
 
-Closing[](#closing)
--------------------
+## Conclusão
+------------
 
-I hope this post gave you confidence in writing your own linker scripts.
+I hope this post gave you confidence in writing your own **script de ligação**s.
 
 In my next post, we’ll talk about writing a bootloader to assist with loading and starting your application.
 
