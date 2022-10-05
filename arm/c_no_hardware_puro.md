@@ -19,14 +19,15 @@ Ao longo da série de posts *do nada ao main()*, desmistificamos o que acontece 
 Embora a maioria dos conceitos e códigos apresentados nesta série funcionem para todos os MCUs da série Cortex-M, nossos exemplos visam o processador SAMD21G18 da Atmel. Este é um chip Cortex-M0+ encontrado em várias placas de desenvolvimento acessíveis.
 
 
-Specifically, we are using:
+Especificamente, estamos usando:
 
-*   Adafruit’s [Metro M0 Express](https://www.adafruit.com/product/3505) as our development board,
-*   a simple [CMSIS-DAP Adapter](https://www.adafruit.com/product/2764)
-*   OpenOCD (the [Arduino fork](https://github.com/arduino/OpenOCD)) for programming
+*   Adafruit’s [Metro M0 Express](https://www.adafruit.com/product/3505) como nossa placa de desenvolvimento,
+*   Um simples [CMSIS-DAP Adapter](https://www.adafruit.com/product/2764)
+*   OpenOCD (the [Arduino fork](https://github.com/arduino/OpenOCD)) para programação
 
-In each case, we’ll implement a simple blinking LED application. It is not particularly interesting in itself, but for the sake of completeness you can find the code reproduced below.
+Em cada caso, implementaremos um aplicativo simples de LED piscando. Não é particularmente interessante por si só, mas por uma questão de completude, você pode encontrar o código reproduzido abaixo.
 
+```c
     #include <samd21g18a.h>
     
     #include <port.h>
@@ -51,6 +52,7 @@ In each case, we’ll implement a simple blinking LED application. It is not par
       }
     }
     
+```
 
 Power on![](#power-on)
 ----------------------
