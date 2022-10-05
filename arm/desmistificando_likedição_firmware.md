@@ -76,12 +76,13 @@ In order to allocate program space, the linker needs to know how much memory is 
 
 The syntax for MEMORY is defined in the [binutils docs](https://sourceware.org/binutils/docs/ld/MEMORY.html#MEMORY) and is as follow:
 
+```
     MEMORY
       {
         name [(attr)] : ORIGIN = origin, LENGTH = len
         …
       }
-    
+```    
 
 Where
 
@@ -92,66 +93,53 @@ Where
 
 The memory map for the SAMD21G18 chip we’ve got on our board can be found in its [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/SAMD21-Family-DataSheet-DS40001882D.pdf) in table 10-1, reproduced below.
 
-SAMD21G18 Memory Map
+**SAMD21G18 Memory Map**
 
-Memory
+| Memória       | Endereço Inicial | Tamanho    |
+|---------------|------------------|------------|
+| Flash Interna | 0x00000000       | 256 Kbytes |
+| SRAM Interna  | 0x20000000       | 32 Kbytes  |
 
-Start Address
+Transcrito em uma definição `MEMORY`, isso nos dá:
 
-Size
-
-Internal Flash
-
-0x00000000
-
-256 Kbytes
-
-Internal SRAM
-
-0x20000000
-
-32 Kbytes
-
-  
-
-Transcribed into a `MEMORY` definition, this gives us:
-
+```
     MEMORY
     {
       rom      (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00040000
       ram      (rwx) : ORIGIN = 0x20000000, LENGTH = 0x00008000
     }
-    
+```
 
-## Section Definitions
--------------------------------------------
+## Definições de seção
+----------------------
 
-Code and data are bucketed into sections, which are contiguous areas of memory. There are no hard rules about how many sections you should have, or what they should be, but you typically want to put symbols in the same section if:
+Código e dados são agrupados em seções, que são áreas contíguas da memória. Não há regras rígidas sobre quantas seções você deve ter ou quais devem ser, mas normalmente você deseja colocar símbolos na mesma seção se:
 
-1.  They should be in the same region of memory, or
-2.  They need to be initialized together.
+1. Eles devem estar na mesma região de memória, ou
+2. Eles precisam ser inicializados juntos.
 
-In our previous post, we learned about two types of symbols that are initialized in bulk:
+Em nosso post anterior, aprendemos sobre dois tipos de símbolos que são inicializados em massa:
 
-1.  Initialized static variables which must be copied from flash
-2.  Uninitialized static variables which must be zeroed.
+1. Variáveis estáticas inicializadas que devem ser copiadas do flash
+2. Variáveis estáticas não inicializadas que devem ser zeradas.
 
-Our **script de ligação** concerns itself with two more things:
+Nosso **script de ligação** se preocupa com mais duas coisas:
 
-1.  Code and constant data, which can live in read-only memory (e.g. flash)
-2.  Reserved sections of RAM, like a stack or a heap
+1. Código e dados constantes, que podem viver na memória somente leitura (por exemplo, flash)
+2. Seções reservadas de RAM, como uma pilha ou heap
 
-By convention, we name those sections as follow:
+Por convenção, nomeamos essas seções da seguinte forma:
 
-1.  `.text` for code & constants
-2.  `.bss` for uninitialized data
-3.  `.stack` for our stack
-4.  `.data` for initialized data
+1. `.text` para código e constantes
+2. `.bss` para dados não inicializados
+3. `.stack` para nossa pilha
+4. `.data` para dados inicializados
 
-The [elf spec](http://refspecs.linuxbase.org/elf/elf.pdf) holds a full list. Your firmware will work just fine if you call them anything else, but your colleagues may be confused and some tools may fail in odd ways. The only constraint is that you may not call your section `/DISCARD/`, which is a reserved keyword.
+A [especificação elf](http://refspecs.linuxbase.org/elf/elf.pdf) contém uma lista completa. Seu firmware funcionará bem se você chamá-los de qualquer outra coisa, mas seus colegas podem ficar confusos e algumas ferramentas podem falhar de maneiras estranhas. A única restrição é que você não pode chamar sua seção `/DISCARD/`, que é uma palavra-chave reservada.
 
-First, let’s look at what happens to our symbols if we do not define any of those sections in the **script de ligação**.
+Primeiro, vamos ver o que acontece com nossos símbolos se não definirmos nenhuma dessas seções no **script de ligação**.
 
+```
     MEMORY
     {
       rom      (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00040000
@@ -162,18 +150,19 @@ First, let’s look at what happens to our symbols if we do not define any of th
     {
         /* empty! */
     }
-    
+```
 
-The linker is perfectly happy to link our program with this. Probing the resulting elf file with objdump, we see the following:
+O vinculador está perfeitamente feliz em vincular nosso programa a isso. Sondando o arquivo elf resultante com objdump, vemos o seguinte:
 
-    $ arm-none-eabi-objdump -h build/minimal.elf
-    build/minimal.elf:     file format elf32-littlearm
+```bash
+$ arm-none-eabi-objdump -h build/minimal.elf
+build/minimal.elf:     file format elf32-littlearm
     
-    SYMBOL TABLE:
-    no symbols
-    
+SYMBOL TABLE:
+no symbols
+```
 
-No symbols! While the linker is able to make assumptions that will allow it to link in symbols with little information, but it at least needs to know either what the entry point should be, or what symbols to put in the text section.
+Sem símbolos! Embora o vinculador seja capaz de fazer suposições que permitirão vincular símbolos com pouca informação, ele precisa pelo menos saber qual deve ser o ponto de entrada ou quais símbolos colocar na seção de texto.
 
 ### `.text` Section[](#text-section)
 
