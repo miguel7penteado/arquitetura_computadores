@@ -1,65 +1,63 @@
-From Zero to main(): Demystifying Firmware Linker Scripts[](#from-zero-to-main-demystifying-firmware-linker-scripts)
---------------------------------------------------------------------------------------------------------------------
+# Do nada ao main(): Desmistificando a linkedição do firmware
+-------------------------------------------------------------
 
-25 Jun 2019 by [François Baldassari](/authors/francois)
+#### Original de *François Baldassari*
 
-This is the second post in our [Zero to main() series](/tag/zero-to-main).
+[Da última vez](/blog/zero-to-main-1), falamos sobre inicializar um ambiente C em um MCU antes de invocar nossa função `main`. Uma coisa que damos como certo foi o fato de que funções e dados acabam no lugar certo em nosso binário. Hoje, vamos nos aprofundar em como isso acontece aprendendo sobre regiões de memória e scripts de linker.
 
-[Last time](/blog/zero-to-main-1), we talked about bootstrapping a C environment on an MCU before invoking our `main` function. One thing we took for granted was the fact that functions and data end up in the right place in our binary. Today, we’re going to dig into how that happens by learning about memory regions and linker scripts.
+Você pode se lembrar das seguintes coisas acontecendo de forma automática:
 
-You may remember the following things happening auto-magically:
+1. Usamos variáveis como `&_ebss`, `&_sdata`, …etc. saber onde cada uma de nossas seções foi colocada em flash e definir onde algumas precisavam ir na RAM.
+2. Um ponteiro para nosso `ResetHandler` foi encontrado no endereço 0x00000004 para o MCU encontrar.
 
-1.  We used variables like `&_ebss`, `&_sdata`, …etc. to know where each of our sections was placed in flash and to define where some needed to go in RAM.
-2.  A pointer to our `ResetHandler` was found at address 0x00000004 for the MCU to find.
+Embora essas coisas sejam verdadeiras para muitos projetos, elas são mantidas juntas, na melhor das hipóteses, por convenção, na pior, por gerações de engenharia de copiar/colar. Você descobrirá que alguns MCUs têm mapas de memória diferentes, alguns scripts de inicialização nomeiam essas variáveis de maneira diferente e alguns programas têm mais ou menos segmentos.
 
-While these things are true for many projects, they are held together at best by convention, at worst by generations of copy/paste engineering. You’ll find some MCUs have different memory maps, some startup scripts name those variables differently, and some programs have more or less segments.
+Como não são padronizados, essas coisas precisam ser especificadas em algum lugar do nosso projeto. No caso de projetos vinculados a uma ferramenta do tipo Unix-`ld`\-like, esse em algum lugar é o script do vinculador.
 
-Since they are not standardized, those things need to be specified somewhere in our project. In the case of projects linked with a Unix-`ld`\-like tool, that somewhere is the linker script.
+Mais uma vez, usaremos nosso programa “minimal” simples, disponível [no Github](https://github.com/memfault/zero-to-main/blob/master/minimal).
 
-Once again, we will use our simple “minimal” program, available [on Github](https://github.com/memfault/zero-to-main/blob/master/minimal).
+Breve cartilha sobre Linkedição
+-------------------------------
 
-Like Interrupt? [Subscribe](https://go.memfault.com/interrupt-subscribe) to get our latest posts straight to your mailbox.
+A vinculação é o último estágio na compilação de um programa. Ele pega vários arquivos de objetos compilados e os mescla em um único programa, preenchendo endereços para que tudo esteja no lugar certo.
 
-Brief Primer on Linking[](#brief-primer-on-linking)
----------------------------------------------------
+Antes de vincular, o compilador terá seus arquivos de origem um por um e os compilado em código de máquina. No processo, ele deixa espaços reservados para endereços, pois (1) não sabe onde o código terminará dentro da estrutura mais ampla do programa e (2) não sabe nada sobre símbolos fora do arquivo ou unidade de compilação atual.
 
-Linking is the last stage in compiling a program. It takes a number of compiled object files and merges them into a single program, filling in addresses so that everything is in the right place.
+O vinculador pega todos esses arquivos de objeto e os mescla junto com dependências externas, como a C Standard Library, em seu programa. Para descobrir quais bits vão para onde, o vinculador depende de um script de vinculador - um modelo para seu programa. Por fim, todos os espaços reservados são substituídos por endereços.
 
-Prior to linking, the compiler will have taken your source files one by one and compiled them into machine code. In the process, it leaves placeholders for addresses as (1) it does not know where the code will end up within the broader structure of the program and (2) it knows nothing about symbols outside of the current file or compilation unit.
+Podemos ver isso em jogo em nosso programa mínimo. Vamos seguir o que acontece com nossa função `main` em `minimal.c` por exemplo. O compilador o compila em um arquivo de objeto com:
 
-The linker takes all of those object files and merges them together along with external dependencies like the C Standard Library into your program. To figure out which bits go where, the linker relies on a linker script - a blueprint for your program. Lastly, all placeholders are replaced by addresses.
+```bash
+usuario@maquina$:\arm-none-eabi-gcc -c -o build/objs/a/b/c/minimal.o minimal.c <CFLAGS>
+```
 
-We can see this at play in our minimal program. Let’s follow what happens to our `main` function in `minimal.c` for example. The compiler builds it into an object file with:
+Podemos despejar símbolos em `minimal.o` para ver `main` dentro dele:
 
-    $ arm-none-eabi-gcc -c -o build/objs/a/b/c/minimal.o minimal.c <CFLAGS>
-    
+```bash
+usuario@maquina$:\arm-none-eabi-nm build/objs/a/b/c/minimal.o
+...
+00000000 T main
+...
+```
 
-We can dump symbols in `minimal.o` to look at `main` within it:
+Como esperado, ainda não tem endereços. Em seguida, vinculamos tudo a:
 
-    $ arm-none-eabi-nm build/objs/a/b/c/minimal.o
-    ...
-    00000000 T main
-    ...
-    
-
-As expected, it does not have addresses yet. We then link everything with:
-
-    $ arm-none-eabi-gcc <LDFLAGS> build/objs/a/b/c/minimal.o <other object files> -o build/minimal.elf
-    
+```bash
+usuario@maquina$:\arm-none-eabi-gcc <LDFLAGS> build/objs/a/b/c/minimal.o <other object files> -o build/minimal.elf
+```
 
 And dump the symbols in the resulting `elf` file:
+```bash
+usuario@maquina$:\arm-none-eabi-nm build/minimal.elf
+...
+00000294 T main
+...
+```
+O linker fez seu trabalho, e nosso símbolo `main` recebeu um endereço.
 
-    $ arm-none-eabi-nm build/minimal.elf
-    ...
-    00000294 T main
-    ...
-    
+O vinculador geralmente faz um pouco mais do que isso. Por exemplo, ele pode gerar informações de depuração, coletar lixo de seções de código não utilizadas ou executar a otimização de todo o programa (também conhecida como Link-Time Optimization ou LTO). Por causa desta conversa, não abordaremos esses tópicos.
 
-The linker has done its job, and our `main` symbol has been assigned an address.
-
-The linker often does a bit more than that. For example, it can generate debug information, garbage collect unused sections of code, or run whole-program optimization (also known as Link-Time Optimization, or LTO). For the sake of this conversation, we will not cover these topics.
-
-For more information on the linker, there’s a great thread on [Stack Overflow](https://stackoverflow.com/questions/3322911/what-do-linkers-do).
+Para obter mais informações sobre o vinculador, há um ótimo tópico em [Stack Overflow](https://stackoverflow.com/questions/3322911/what-do-linkers-do).
 
 Anatomy of a Linker Script[](#anatomy-of-a-linker-script)
 ---------------------------------------------------------
