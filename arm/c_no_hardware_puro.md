@@ -122,7 +122,7 @@ Vamos despejar nossos símbolos para ver qual deles está em `0x000000c1`.
     ...
     000000b4 g     F .text  00000006 NMI_Handler
     000000ba g     F .text  00000006 HardFault_Handler
-    000000c0 g     F .text  00000088 Reset_Handler
+    000000c0 g     F .text  00000088 Reset_Handler (Interrupção_de_Reset)
     00000148 l     F .text  0000005c system_pinmux_get_group_from_gpio_pin
     000001a4 l     F .text  00000020 port_get_group_from_gpio_pin
     000001c4 l     F .text  00000022 port_get_config_defaults
@@ -133,11 +133,11 @@ Vamos despejar nossos símbolos para ver qual deles está em `0x000000c1`.
     ...
 ```
 
-Isso é estranho! Nossa função principal é encontrada em `0x000002ac`. Nenhum símbolo em `0x000000c1`, mas um símbolo `Reset_Handler` em `0x000000c0`.
+Isso é estranho! Nossa função principal é encontrada em `0x000002ac`. Nenhum símbolo em `0x000000c1`, mas um símbolo `Reset_Handler (Interrupção_de_Reset)` em `0x000000c0`.
 
-Acontece que o bit mais baixo do PC é usado para indicar instruções thumb2, que é um dos dois conjuntos de instruções suportados por processadores ARM, então `Reset_Handler` é o que estamos procurando (para mais detalhes, confira a seção A4. 1.1 no manual ARMv6-M).
+Acontece que o bit mais baixo do PC é usado para indicar instruções thumb2, que é um dos dois conjuntos de instruções suportados por processadores ARM, então `Reset_Handler (Interrupção_de_Reset)` é o que estamos procurando (para mais detalhes, confira a seção A4. 1.1 no manual ARMv6-M).
 
-## Escrevendo um Reset_Handler
+## Escrevendo um Reset_Handler (Interrupção_de_Reset)
 ----------------------------------------------------
 
 Infelizmente, o Reset\_Handler geralmente é uma bagunça indecifrável de código Assembly. Veja o arquivo [nRF52 SDK startup](https://github.com/NordicSemiconductor/nrfx/blob/293f553ed9551c1fdfd05eac48e75bbdeb4e7290/mdk/gcc_startup_nrf52.S#L217) por exemplo.
@@ -168,7 +168,7 @@ Na prática, isso significa que, dado o seguinte trecho:
     static uint32_t bar = 2;
 ```
 
-Nosso `Reset_Handler` precisa garantir que a memória em `&foo` seja 0x00000000, e a memória em `&bar` seja 0x00000002.
+Nosso `Reset_Handler (Interrupção_de_Reset)` precisa garantir que a memória em `&foo` seja 0x00000000, e a memória em `&bar` seja 0x00000002.
 
 Não podemos simplesmente inicializar cada variável uma por uma. Em vez disso, contamos com o compilador (tecnicamente, o vinculador) para colocar todas essas variáveis no mesmo lugar para que possamos inicializá-las de uma só vez.
 
@@ -199,10 +199,10 @@ Podemos então fazer:
     }
 ```
 
-Juntando, podemos escrever nosso `Reset_Handler`
+Juntando, podemos escrever nosso `Reset_Handler (Interrupção_de_Reset)`
 
 ```c
-    void Reset_Handler(void)
+    void Reset_Handler (Interrupção_de_Reset)(void)
     {
         /* Copy init values from text to data */
         uint32_t *init_values_ptr = &_etext;
@@ -224,7 +224,7 @@ Juntando, podemos escrever nosso `Reset_Handler`
 Ainda precisamos começar nosso programa! Isso é conseguido com uma simples chamada para `main()`.
 
 ```c
-    void Reset_Handler(void)
+    void Reset_Handler (Interrupção_de_Reset)(void)
     {
         /* Copy init values from text to data */
         uint32_t *init_values_ptr = &_etext;
@@ -255,7 +255,7 @@ Ainda precisamos começar nosso programa! Isso é conseguido com uma simples cha
 Você notará que adicionamos duas coisas:
 
 1. Um loop infinito depois de `main()`, para não corrermos para as ervas daninhas se a função principal retornar
-2. Solução alternativa para bugs de chip que devem ser resolvidos antes do início do nosso programa. Algumas vezes estes são encapsulados em uma função `SystemInit` chamada pelo `Reset_Handler` antes de `main`. Esta é a abordagem [tomada pela Nordic](https://github.com/NordicSemiconductor/nrfx/blob/6f54f689e9555ea18f9aca87caf44a3419e5dd7a/mdk/system_nrf52811.c#L60).
+2. Solução alternativa para bugs de chip que devem ser resolvidos antes do início do nosso programa. Algumas vezes estes são encapsulados em uma função `SystemInit` chamada pelo `Reset_Handler (Interrupção_de_Reset)` antes de `main`. Esta é a abordagem [tomada pela Nordic](https://github.com/NordicSemiconductor/nrfx/blob/6f54f689e9555ea18f9aca87caf44a3419e5dd7a/mdk/system_nrf52811.c#L60).
 
 # Conclusão
 -----------
@@ -264,14 +264,14 @@ Todo o código usado nesta postagem do blog está disponível no [Github](https:
 
 Vê algo que você gostaria de mudar? Envie um pull request ou abra um problema no [GitHub](https://github.com/memfault/interrupt)
 
-Programas mais complexos geralmente requerem um `Reset_Handler` mais complicado. Por exemplo:
+Programas mais complexos geralmente requerem um `Reset_Handler (Interrupção_de_Reset)` mais complicado. Por exemplo:
 
 1. O código realocável deve ser copiado
 2. Se nosso programa depende de libc, devemos inicializá-lo
      _EDIT: Post escrito!_ - [From Zero to main(): Bootstrapping libc with Newlib](/blog/boostrapping-libc-with-newlib)
 3. Layouts de memória mais complexos podem adicionar alguns loops de cópia/zero
 
-Abordaremos todos eles em posts futuros. Mas antes disso, falaremos sobre como surgem as variáveis mágicas da região de memória, como o endereço do nosso `Reset_Handler` termina em `0x00000004` e como escrever um script de linker em nosso próximo post!
+Abordaremos todos eles em posts futuros. Mas antes disso, falaremos sobre como surgem as variáveis mágicas da região de memória, como o endereço do nosso `Reset_Handler (Interrupção_de_Reset)` termina em `0x00000004` e como escrever um script de linker em nosso próximo post!
 
 ![](/img/author/francois.jpg) [François Baldassari](/authors/francois) has worked on the embedded software teams at Sun, Pebble, and Oculus. He is currently the CEO of [Memfault](https://memfault.com).  
 [](https://twitter.com/baldassarifr)[](https://www.linkedin.com/in/francois-baldassari)[](https://github.com/franc0is)
