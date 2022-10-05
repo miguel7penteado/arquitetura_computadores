@@ -54,8 +54,8 @@ Em cada caso, implementaremos um aplicativo simples de LED piscando. Não é par
     
 ```
 
-Power on![](#power-on)
-----------------------
+## Ligando o botão de Power
+---------------------------
 
 Então, como chegamos ao principal? Tudo o que podemos dizer pela observação é que aplicamos energia à placa e nosso código começou a ser executado. Deve haver um comportamento intrínseco ao chip que define como o código é executado.
 
@@ -113,9 +113,9 @@ Primeiro, despejamos nosso arquivo `bin` para ver qual endereço `0x0000000` e `
     00000090: 0000 0000 0000 0000 0000 0000 0000 0000  ................
 ```
 
-If I’m reading this correctly, our inital SP is `0x20002000`, and our start address pointer is `0x000000c1`.
+Se estou lendo isso corretamente, nosso SP inicial é 0x20002000 e nosso ponteiro de endereço inicial é 0x000000c1.
 
-Let’s dump our symbols to see which one is at `0x000000c1`.
+Vamos despejar nossos símbolos para ver qual deles está em `0x000000c1`.
 
 ```bash
     usuario@maquina$:\arm-none-eabi-objdump -t build/minimal.elf | sort
@@ -133,36 +133,26 @@ Let’s dump our symbols to see which one is at `0x000000c1`.
     ...
 ```
 
-That’s odd! Our main function is found at `0x000002ac`. No symbol at `0x000000c1`, but a `Reset_Handler` symbol at `0x000000c0`.
+Isso é estranho! Nossa função principal é encontrada em `0x000002ac`. Nenhum símbolo em `0x000000c1`, mas um símbolo `Reset_Handler` em `0x000000c0`.
 
-It turns out that the lowest bit of the PC is used to indicate thumb2 instructions, which is one of the two instruction sets supported by ARM processors, so `Reset_Handler` is what we’re looking for (for more details check out section A4.1.1 in the ARMv6-M manual).
+Acontece que o bit mais baixo do PC é usado para indicar instruções thumb2, que é um dos dois conjuntos de instruções suportados por processadores ARM, então `Reset_Handler` é o que estamos procurando (para mais detalhes, confira a seção A4. 1.1 no manual ARMv6-M).
 
-Writing a Reset\_Handler[](#writing-a-reset_handler)
+## Escrevendo um Reset_Handler
 ----------------------------------------------------
 
-Unfortunately, the Reset\_Handler is often an inscrutable mess of Assembly code. See the [nRF52 SDK startup](https://github.com/NordicSemiconductor/nrfx/blob/293f553ed9551c1fdfd05eac48e75bbdeb4e7290/mdk/gcc_startup_nrf52.S#L217) file for example.
+Infelizmente, o Reset\_Handler geralmente é uma bagunça indecifrável de código Assembly. Veja o arquivo [nRF52 SDK startup](https://github.com/NordicSemiconductor/nrfx/blob/293f553ed9551c1fdfd05eac48e75bbdeb4e7290/mdk/gcc_startup_nrf52.S#L217) por exemplo.
 
-Instead of going through this file line-by-line, let’s see if we can write a minimal Reset\_Handler from first principles.
+Em vez de passar por este arquivo linha por linha, vamos ver se podemos escrever um Reset\_Handler mínimo a partir dos primeiros princípios.
 
-Here again, ARM’s Technical Reference Manuals are useful. [Section 5.9.2 of the Cortex-M3 TRM](https://developer.arm.com/docs/ddi0337/e/exceptions/resets/intended-boot-up-sequence) contains the following table:
+Aqui, novamente, os Manuais de Referência Técnica da ARM são úteis. [Seção 5.9.2 do Cortex-M3 TRM](https://developer.arm.com/docs/ddi0337/e/exceptions/resets/intended-boot-up-sequence) contém a seguinte tabela:
 
-Reset boot-up behavior
+**Reset boot-up behavior**
 
-Action
-
-Description
-
-Initialize variables
-
-Any global/static variables must be setup. This includes initializing the BSS variable to 0, and copying initial values from ROM to RAM for non-constant variables.
-
-\[Setup stacks\]
-
-If more than one stack is be used, the other banked SPs must be initialized. The current SP can also be changed to Process from Main.
-
-\[Initialize any runtime\]
-
-Optionally make calls to C/C++ runtime init code to enable use of heap, floating point, or other features. This is normally done by `__main` from the C/C++ library.
+| Ação                                    | Descrição                                                                                                                                                                                                         |   |   |   |
+|-----------------------------------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|---|---|---|
+| Inicializar Variáveis                   | Quaisquer variáveis globais/estáticas devem ser configuradas. Isso inclui inicializar a variável BSS como 0 e copiar valores iniciais de ROM para RAM para variáveis não constantes.                              |   |   |   |
+| [Configurar a pilha]                    | Se mais de uma pilha for usada, os outros SPs em banco devem ser inicializados. O SP atual também pode ser alterado para Process from Main.                                                                       |   |   |   |
+| [Inicialize qualquer tempo de execução] | Opcionalmente, faça chamadas para o código de inicialização do tempo de execução C/C++ para habilitar o uso de heap, ponto flutuante ou outros recursos. Isso normalmente é feito por __main da biblioteca C/C++. |   |   |   |
 
   
 So, our ResetHandler is responsible for initializing static and global variables, and starting our program. This mirrors what the C standards tells us:
