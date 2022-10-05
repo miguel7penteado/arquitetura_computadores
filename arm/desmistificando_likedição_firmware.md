@@ -72,9 +72,9 @@ Um **script de ligação** contém quatro coisas:
 ## Layout de memória
 -------------------------------
 
-In order to allocate program space, the linker needs to know how much memory is available, and at what addresses that memory exists. This is what the `MEMORY` definition in the **script de ligação** is for.
+Para alocar espaço de programa, o vinculador precisa saber quanta memória está disponível e em quais endereços essa memória existe. É para isso que serve a definição `MEMORY` no **script de ligação**.
 
-The syntax for MEMORY is defined in the [binutils docs](https://sourceware.org/binutils/docs/ld/MEMORY.html#MEMORY) and is as follow:
+A sintaxe para MEMORY é definida nos [documentos do binutils](https://sourceware.org/binutils/docs/ld/MEMORY.html#MEMORY) e é a seguinte:
 
 ```
     MEMORY
@@ -84,14 +84,14 @@ The syntax for MEMORY is defined in the [binutils docs](https://sourceware.org/b
       }
 ```    
 
-Where
+Onde
 
-*   `name` is a name you want to use for this region. Names do not carry meaning, so you’re free to use anything you want. You’ll often find “flash”, and “ram” as region names.
-*   `(attr)` are optional attributes for the region, like whether it’s writable (`w`), readable (`r`), or executable (`x`). Flash memory is usually `(rx)`, while ram is `rwx`. Marking a region as non-writable does not magically make it write protected: these attributes are meant to describe the properties of the memory, not set it.
-*   `origin` is the start address of the memory region.
-*   `len` is the size of the memory region, in bytes.
+* `name` é um nome que você deseja usar para esta região. Os nomes não têm significado, então você pode usar o que quiser. Você encontrará frequentemente “flash” e “ram” como nomes de região.
+* `(attr)` são atributos opcionais para a região, como se é gravável (`w`), legível (`r`) ou executável (`x`). A memória flash geralmente é `(rx)`, enquanto a ram é `rwx`. Marcar uma região como não gravável não a torna magicamente protegida contra gravação: esses atributos destinam-se a descrever as propriedades da memória, não a configurá-la.
+* `origin` é o endereço inicial da região de memória.
+* `len` é o tamanho da região de memória, em bytes.
 
-The memory map for the SAMD21G18 chip we’ve got on our board can be found in its [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/SAMD21-Family-DataSheet-DS40001882D.pdf) in table 10-1, reproduced below.
+O mapa de memória para o chip SAMD21G18 que temos em nossa placa pode ser encontrado em seu [datasheet](http://ww1.microchip.com/downloads/en/DeviceDoc/SAMD21-Family-DataSheet-DS40001882D.pdf) em tabela 10-1, reproduzida abaixo.
 
 **SAMD21G18 Memory Map**
 
@@ -166,7 +166,7 @@ Sem símbolos! Embora o vinculador seja capaz de fazer suposições que permitir
 
 ### `.text` Section[](#text-section)
 
-Let’s start by adding our `.text` section. We want that section in ROM. The syntax is simple:
+Vamos começar adicionando nossa seção `.text`. Queremos essa seção em ROM. A sintaxe é simples:
 
     SECTIONS
     {
@@ -177,10 +177,11 @@ Let’s start by adding our `.text` section. We want that section in ROM. The sy
     }
     
 
-This defines a section named `.text`, and adds it to the ROM. We now need to tell the linker what to put in that section. This is accomplished by listing all of the sections from our input object files we want in `.text`.
+Isso define uma seção chamada `.text` e a adiciona à ROM. Agora precisamos dizer ao vinculador o que colocar nessa seção. Isso é feito listando todas as seções de nossos arquivos de objeto de entrada que queremos em `.text`.
 
-To find out what sections are in our object file, we can once again use `objdump`:
+Para descobrir quais seções estão em nosso arquivo objeto, podemos mais uma vez usar `objdump`:
 
+```bash
     $ arm-none-eabi-objdump -h
     build/objs/a/b/c/minimal.o:     file format elf32-littlearm
     
@@ -215,11 +216,11 @@ To find out what sections are in our object file, we can once again use `objdump
                       CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
      11 .text.main    0000002c  00000000  00000000  00000198  2**2
                       CONTENTS, ALLOC, LOAD, RELOC, READONLY, CODE
-    
+```
 
-We see that each of our symbol has a section. This is due to the fact that we compiled our firmware with the `-ffunction-sections` and `-fdata-sections` flags. Had we not included them, the compiler would have been free to merge several functions into a single `text.<some identifier>` section.
+Vemos que cada um dos nossos símbolos tem uma seção. Isso se deve ao fato de que compilamos nosso firmware com os sinalizadores `-ffunction-sections` e `-fdata-sections`. Se não as tivéssemos incluído, o compilador estaria livre para mesclar várias funções em uma única seção `text.<algum identificador>`.
 
-To put all of our functions in the `.text` section in our **script de ligação**, we use the following syntax: `<filename>(<section>)`, where `filename` is the name of the input files whose symbols we want to include, and `section` is the name of the input sections. Since we want all `.text...` sections in all files, we use the wildcard `*`:
+Para colocar todas as nossas funções na seção `.text` em nosso **script de ligação**, usamos a seguinte sintaxe: `<filename>(<section>)`, onde `filename` é o nome da entrada arquivos cujos símbolos queremos incluir, e `section` é o nome das seções de entrada. Como queremos todas as seções `.text...` em todos os arquivos, usamos o curinga `*`:
 
     .text :
     {
@@ -228,10 +229,11 @@ To put all of our functions in the `.text` section in our **script de ligação*
     } > rom
     
 
-Note the `.vector` input section, which contains functions we want to keep at the very start of our `.text` section. This is so the `Reset_Handler` is where the MCU expects it to be. We’ll talk more about the vector table in a future post.
+Observe a seção de entrada `.vector`, que contém funções que queremos manter no início da nossa seção `.text`. É assim que o `Reset_Handler` está onde o MCU espera que esteja. Falaremos mais sobre a tabela de vetores em um post futuro.
 
-Dumping our elf file, we now see all of our functions (but no data)!
+Despejando nosso arquivo elf, agora vemos todas as nossas funções (mas nenhum dado)!
 
+```bash
     $ arm-none-eabi-objdump -t build/minimal.elf
     
     build/minimal.elf:     file format elf32-littlearm
@@ -255,12 +257,13 @@ Dumping our elf file, we now see all of our functions (but no data)!
     000001b8 g     F .text  0000004e port_pin_set_config
     00000374 g     F .text  00000040 system_pinmux_pin_set_config
     ...
-    
+```
 
 ### `.bss` Section[](#bss-section)
 
-Now, let’s take care of our `.bss`. Remember, this is the section we put uninitialized static memory in. `.bss` must be reserved in the memory map, but there is nothing to load, as all variables are initialized to zero. As such, this is what it should look like:
+Agora, vamos cuidar do nosso `.bss`. Lembre-se, esta é a seção onde colocamos a memória estática não inicializada. `.bss` deve ser reservado no mapa de memória, mas não há nada para carregar, pois todas as variáveis são inicializadas em zero. Dessa forma, é assim que deve ficar:
 
+```
     SECTION {
         ...
         .bss (NOLOAD) :
@@ -269,20 +272,21 @@ Now, let’s take care of our `.bss`. Remember, this is the section we put unini
             *(COMMON)
         } > ram
     }
-    
+``` 
 
-You’ll note that the `.bss` section also includes `*(COMMON)`. This is a special input section where the compiler puts global uninitialized variables that go beyond file scope. `int foo;` goes there, while `static int foo;` does not. This allows the linker to merge multiple definitions into one symbol if they have the same name.
+Você notará que a seção `.bss` também inclui `*(COMMON)`. Esta é uma seção de entrada especial onde o compilador coloca variáveis globais não inicializadas que vão além do escopo do arquivo. `int foo;` vai lá, enquanto `static int foo;` não. Isso permite que o vinculador mescle várias definições em um símbolo se elas tiverem o mesmo nome.
 
-We indicate that this section is not loaded with the `NOLOAD` property. This is the only section property used in modern **script de ligação**s.
+Indicamos que esta seção não está carregada com a propriedade `NOLOAD`. Esta é a única propriedade de seção usada em **scripts de ligação** modernos.
 
 ### `.stack` Section[](#stack-section)
 
-We do the same thing for our `.stack` memory, since it is in RAM and not loaded. As the stack contains no symbols, we must explicitly reserve space for it by indicating its size. We also must align the stack on an 8-byte boundary per ARM Procedure Call Standards ([AAPCS](https://static.docs.arm.com/ddi0403/ec/DDI0403E_c_armv7m_arm.pdf)).
+Fazemos a mesma coisa para nossa memória `.stack`, já que ela está na RAM e não está carregada. Como a pilha não contém símbolos, devemos reservar espaço explicitamente para ela indicando seu tamanho. Também devemos alinhar a pilha em um limite de 8 bytes por Padrões de Chamada de Procedimento ARM ([AAPCS](https://static.docs.arm.com/ddi0403/ec/DDI0403E_c_armv7m_arm.pdf)).
 
-In order to achieve these goals, we turn to a special variable `.`, also known as the “location counter”. The location counter tracks the current offset into a given memory region. As sections are added, the location counter increments accordingly. You can force alignment or gaps by setting the location counter forward. You may not set it backwards, and the linker will throw an error if you try.
+Para atingir esses objetivos, recorremos a uma variável especial `.`, também conhecida como “contador de localização”. O contador de localização rastreia o deslocamento atual em uma determinada região de memória. À medida que as seções são adicionadas, o contador de local é incrementado de acordo. Você pode forçar o alinhamento ou as lacunas definindo o contador de localização para frente. Você não pode configurá-lo para trás e o vinculador lançará um erro se você tentar.
 
-We set the location counter with the `ALIGN` function, to align the section, and use simple assignment and arithmetic to set the section size:
+Definimos o contador de localização com a função `ALIGN`, para alinhar a seção, e usamos atribuição simples e aritmética para definir o tamanho da seção:
 
+```
     STACK_SIZE = 0x2000; /* 8 kB */
     
     SECTION {
@@ -295,28 +299,30 @@ We set the location counter with the `ALIGN` function, to align the section, and
         } > ram
         ...
     }
-    
+``` 
 
-Only one more section to go!
+Falta apenas mais uma seção!
 
-### `.data` Section[](#data-section)
+### `.data` Section
 
-The `.data` section contains static variables which have an initial value at boot. You will remember from our previous article that since RAM isn’t persisted while power is off, those sections need to be loaded from flash. At boot, the `Reset_Handler` copies the data from flash to RAM before the `main` function is called.
+A seção `.data` contém variáveis estáticas que possuem um valor inicial na inicialização. Você se lembrará de nosso artigo anterior que, como a RAM não persiste enquanto a energia está desligada, essas seções precisam ser carregadas do flash. Na inicialização, o `Reset_Handler` copia os dados do flash para a RAM antes que a função `main` seja chamada.
 
-To make this possible, every section in our **script de ligação** has two addresses, its _load_ address (LMA) and its _virtual_ address (VMA). In a firmware context, the LMA is where your JTAG loader needs to place the section and the VMA is where the section is found during execution.
+Para tornar isso possível, cada seção em nosso **script de ligação** tem dois endereços, seu endereço _load_ (LMA) e seu endereço _virtual_ (VMA). Em um contexto de firmware, o LMA é onde seu carregador JTAG precisa colocar a seção e o VMA é onde a seção é encontrada durante a execução.
 
-You can think of the LMA as the address “at rest” and the VMA the address during execution i.e. when the device is on and the program is running.
+Você pode pensar no LMA como o endereço “em repouso” e no VMA o endereço durante a execução, ou seja, quando o dispositivo está ligado e o programa está em execução.
 
-The syntax to specify the LMA and VMA is relatively straightforward: every address is two part: AT . In our case it looks like this:
+A sintaxe para especificar o LMA e o VMA é relativamente simples: cada endereço tem duas partes: AT . No nosso caso fica assim:
 
+```
     .data :
     {
         *(.data*);
     } > ram AT > rom  /* "> ram" is the VMA, "> rom" is the LMA */
-    
+```
 
-Note that instead of appending a section to a memory region, you could also explicitly specify an address like so:
+Observe que, em vez de anexar uma seção a uma região de memória, você também pode especificar explicitamente um endereço da seguinte forma:
 
+```
     .data ORIGIN(ram) /* VMA */ : AT(ORIGIN(rom)) /* LMA */
     {
         . = ALIGN(4);
@@ -325,14 +331,15 @@ Note that instead of appending a section to a memory region, you could also expl
         . = ALIGN(4);
         _edata = .;
     }
-    
+``` 
 
-Where `ORIGIN(<region>)` is a simple way to specify the start of a region. You can enter an address in hex as well.
+Onde `ORIGIN(<region>)` é uma maneira simples de especificar o início de uma região. Você também pode inserir um endereço em hexadecimal.
 
-And we’re done! Here’s our complete **script de ligação** with every section:
+E terminamos! Aqui está nosso **script de ligação** completo com cada seção:
 
-### Complete **script de ligação**[](#complete-linker-script)
+### **script de ligação completo!**
 
+```C
     MEMORY
     {
       rom      (rx)  : ORIGIN = 0x00000000, LENGTH = 0x00040000
@@ -373,31 +380,31 @@ And we’re done! Here’s our complete **script de ligação** with every secti
     
         _end = . ;
     }
-    
+```
 
-You can find the full details on **script de ligação** sections syntax in the [ld manual](https://sourceware.org/binutils/docs/ld/SECTIONS.html#SECTIONS).
+Você pode encontrar todos os detalhes sobre a sintaxe das seções **script de ligação** no [ld manual](https://sourceware.org/binutils/docs/ld/SECTIONS.html#SECTIONS).
 
-## Variables
+## Variáveis
 -----------------------
+No primeiro post, nosso `ResetHandler` dependia de variáveis aparentemente mágicas para saber o endereço de cada uma de nossas seções de memória. Acontece que essas variáveis vieram
 
-In the first post, our `ResetHandler` relied on seemingly magic variables to know the address of each of our sections of memory. It turns out, those variable came
+Para disponibilizar endereços de seção para código, o vinculador é capaz de gerar símbolos e adicioná-los ao programa.
 
-In order to make section addresses available to code, the linker is able to generate symbols and add them to the program.
+Você pode encontrar a sintaxe na [documentação do linker](https://sourceware.org/binutils/docs/ld/Simple-Assignments.html#Simple-Assignments), ela se parece exatamente com uma atribuição C: `symbol = expression; `
 
-You can find the syntax in the [linker documentation](https://sourceware.org/binutils/docs/ld/Simple-Assignments.html#Simple-Assignments), it looks exactly like a C assignment: `symbol = expression;`
+Aqui, precisamos:
 
-Here, we need:
+1. `_etext` o final do código na seção `.text` em flash.
+2. `_sdata` o início da seção `.data` na RAM
+3. `_edata` o final da seção `.data` na RAM
+4. `_sbss` o início da seção `.bss` na RAM
+5. `_ebss` o final da seção `.bss` na RAM
 
-1.  `_etext` the end of the code in `.text` section in flash.
-2.  `_sdata` the start of the `.data` section in RAM
-3.  `_edata` the end of the `.data` section in RAM
-4.  `_sbss` the start of the `.bss` section in RAM
-5.  `_ebss` the end of the `.bss` section in RAM
+Eles são todos relativamente simples: podemos atribuir nossos símbolos ao valor do contador de localização (`.`) no início e no final de cada definição de seção.
 
-They are all relatively straightforward: we can assign our symbols to the value of the location counter (`.`) at the start and at the end of each section definition.
+O código está abaixo:
 
-The code is below:
-
+```C
         .text :
         {
             KEEP(*(.vectors .vectors.*))
@@ -420,27 +427,27 @@ The code is below:
             *(.data*);
             _edata = .;
         } > ram AT >rom
-    
+```    
 
-One quirk of these linker-provided symbols: you must use a reference to them, never the variable themselves. For example, the following gets us a pointer to the start of the `.data` section:
+Uma peculiaridade desses símbolos fornecidos pelo vinculador: você deve usar uma referência a eles, nunca a própria variável. Por exemplo, o seguinte nos dá um ponteiro para o início da seção `.data`:
 
+```C
     uint8_t *data_byte = &_sdata;
-    
+``` 
 
-You can read more details about this in the [binutils docs](https://sourceware.org/binutils/docs/ld/Source-Code-Reference.html).
+Você pode ler mais detalhes sobre isso nos [documentos do binutils](https://sourceware.org/binutils/docs/ld/Source-Code-Reference.html).
 
 ## Conclusão
 ------------
+Espero que este post tenha lhe dado confiança para escrever seu próprio **script de ligação**s.
 
-I hope this post gave you confidence in writing your own **script de ligação**s.
+No meu próximo post, falaremos sobre como escrever um bootloader para ajudar a carregar e iniciar seu aplicativo.
 
-In my next post, we’ll talk about writing a bootloader to assist with loading and starting your application.
+_EDIT: Post escrito!_ - [Escrevendo um bootloader do zero](/blog/how-to-write-a-bootloader-from-scratch)
 
-_EDIT: Post written!_ - [Writing a Bootloader from Scratch](/blog/how-to-write-a-bootloader-from-scratch)
+Assim como nas postagens anteriores, os exemplos de código estão disponíveis no Github no [repositório zero to main](https://github.com/memfault/zero-to-main)
 
-As with previous posts, code examples are available on Github in the [zero to main repository](https://github.com/memfault/zero-to-main)
-
-See anything you'd like to change? Submit a pull request or open an issue at [GitHub](https://github.com/memfault/interrupt)
+Vê algo que você gostaria de mudar? Envie um pull request ou abra um problema no [GitHub](https://github.com/memfault/interrupt)
 
 Like Interrupt? [Subscribe](https://go.memfault.com/interrupt-subscribe) to get our latest posts straight to your mailbox.
 
