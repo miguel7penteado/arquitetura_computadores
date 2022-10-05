@@ -57,10 +57,11 @@ Em cada caso, implementaremos um aplicativo simples de LED piscando. Não é par
 Power on![](#power-on)
 ----------------------
 
-So how did we get to main? All we can tell from observation is that we applied power to the board and our code started executing. There must be behavior intrinsic to the chip that defines how code is executed.
+Então, como chegamos ao principal? Tudo o que podemos dizer pela observação é que aplicamos energia à placa e nosso código começou a ser executado. Deve haver um comportamento intrínseco ao chip que define como o código é executado.
 
-And indeed, there is! Digging into the [ARMv6-M Technical Reference Manual](https://static.docs.arm.com/ddi0419/d/DDI0419D_armv6m_arm.pdf), which is the underlying architecture manual for the Cortex-M0+, we can find some pseudo-code that describes reset behavior:
+E de fato, existe! Examinando o [ARMv6-M Technical Reference Manual](https://static.docs.arm.com/ddi0419/d/DDI0419D_armv6m_arm.pdf), que é o manual de arquitetura subjacente para o Cortex-M0+, podemos encontrar alguns pseudo -código que descreve o comportamento de redefinição:
 
+```c
     // B1.5.5 TakeReset()
     // ============
     TakeReset()
@@ -83,22 +84,23 @@ And indeed, there is! Digging into the [ARMv6-M Technical Reference Manual](http
         SP_process = ((bits(30) UNKNOWN):'00');
         start = MemA[vectortable+4,4]; // Load address of reset routine
         BLXWritePC(start); // Start execution of reset routine
-    
+```
 
-In short, the chip does the following:
+Em resumo, o chip faz o seguinte:
 
-*   Reset the vector table address to `0x00000000`
-*   Disable all interrupts
-*   Load the SP from address `0x00000000`
-*   Load the PC from address `0x00000004`
+*   Redefina o endereço da tabela de vetores para `0x00000000`
+*   Desabilitar todas as interrupções
+*   Carregar o SP do endereço `0x00000000`
+*   Carregar o PC do endereço `0x00000004`
 
-“Mystery solved!”, you’ll say. Our `main` function must be at address `0x00000004`!
+“Mistério resolvido!”, você dirá. Nossa função `main` deve estar no endereço `0x00000004`!
 
-Let us check.
+Vamos verificar.
 
-First, we dump our `bin` file to see what address `0x0000000` and `0x00000004` contain:
+Primeiro, despejamos nosso arquivo `bin` para ver qual endereço `0x0000000` e `0x00000004` contêm:
 
-    francois-mba:zero-to-main francois$ xxd build/minimal/minimal.bin  | head
+```bash
+    usuario@maquina$:\xxd build/minimal/minimal.bin  | head
     00000000: 0020 0020 c100 0000 b500 0000 bb00 0000  . . ............
     00000010: 0000 0000 0000 0000 0000 0000 0000 0000  ................
     00000020: 0000 0000 0000 0000 0000 0000 0000 0000  ................
@@ -109,13 +111,14 @@ First, we dump our `bin` file to see what address `0x0000000` and `0x00000004` c
     00000070: 0000 0000 0000 0000 0000 0000 0000 0000  ................
     00000080: 0000 0000 0000 0000 0000 0000 0000 0000  ................
     00000090: 0000 0000 0000 0000 0000 0000 0000 0000  ................
-    
+```
 
 If I’m reading this correctly, our inital SP is `0x20002000`, and our start address pointer is `0x000000c1`.
 
 Let’s dump our symbols to see which one is at `0x000000c1`.
 
-    francois-mba:minimal francois$ arm-none-eabi-objdump -t build/minimal.elf | sort
+```bash
+    usuario@maquina$:\arm-none-eabi-objdump -t build/minimal.elf | sort
     ...
     000000b4 g     F .text  00000006 NMI_Handler
     000000ba g     F .text  00000006 HardFault_Handler
@@ -128,7 +131,7 @@ Let’s dump our symbols to see which one is at `0x000000c1`.
     0000026c l     F .text  00000040 set_output
     000002ac g     F .text  0000002c main
     ...
-    
+```
 
 That’s odd! Our main function is found at `0x000002ac`. No symbol at `0x000000c1`, but a `Reset_Handler` symbol at `0x000000c0`.
 
