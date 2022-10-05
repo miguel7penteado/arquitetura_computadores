@@ -155,38 +155,41 @@ Aqui, novamente, os Manuais de Referência Técnica da ARM são úteis. [Seção
 | [Inicialize qualquer tempo de execução] | Opcionalmente, faça chamadas para o código de inicialização do tempo de execução C/C++ para habilitar o uso de heap, ponto flutuante ou outros recursos. Isso normalmente é feito por __main da biblioteca C/C++. |   |   |   |
 
   
-So, our ResetHandler is responsible for initializing static and global variables, and starting our program. This mirrors what the C standards tells us:
+Assim, nosso ResetHandler é responsável por inicializar variáveis estáticas e globais, e iniciar nosso programa. Isso reflete o que os padrões C nos dizem:
 
-> All objects with static storage duration shall be initialized (set to their initial values) before program startup. The manner and timing of such initialization are otherwise unspecified.
+> Todos os objetos com duração de armazenamento estático devem ser inicializados (definidos para seus valores iniciais) antes da inicialização do programa. A maneira e o tempo de tal inicialização não são especificados.
 
-(Section 5.1.2, Execution environment)
+(Seção 5.1.2, Ambiente de execução)
 
-In practice this means that given the following snippet:
+Na prática, isso significa que, dado o seguinte trecho:
 
+```c
     static uint32_t foo;
     static uint32_t bar = 2;
-    
+```
 
-Our `Reset_Handler` needs to make sure that the memory at `&foo` is 0x00000000, and the memory at `&bar` is 0x00000002.
+Nosso `Reset_Handler` precisa garantir que a memória em `&foo` seja 0x00000000, e a memória em `&bar` seja 0x00000002.
 
-We cannot just go and initialize each variable one by one. Instead, we rely on the compiler (technically, the linker) to put all those variables in the same place so we can initialize them in one fell swoop.
+Não podemos simplesmente inicializar cada variável uma por uma. Em vez disso, contamos com o compilador (tecnicamente, o vinculador) para colocar todas essas variáveis no mesmo lugar para que possamos inicializá-las de uma só vez.
 
-For static variables that must be zeroed, the linker gives us `_sbss` and `_ebss` as start and end addresses. We can therefore do:
+Para variáveis estáticas que devem ser zeradas, o linker nos dá `_sbss` e `_ebss` como endereços inicial e final. Podemos, portanto, fazer:
 
+```c
     /* Clear the zero segment */
     for (uint32_t *bss_ptr = &_sbss; bss_ptr < &_ebss;) {
         *bss_ptr++ = 0;
     }
-    
+```
 
-For static variables with an init value, the linker gives us:
+Para variáveis estáticas com um valor de inicialização, o vinculador nos fornece:
 
-*   `_etext` as the address the init values are stored at
-*   `_sdata` as the address the static variables live at
-*   `_edata` as the end of the static variables memory
+* `_etext` como o endereço em que os valores de inicialização são armazenados
+* `_sdata` como o endereço em que as variáveis estáticas vivem
+* `_edata` como o fim da memória de variáveis estáticas
 
-We then can do:
+Podemos então fazer:
 
+```c
     uint32_t *init_values_ptr = &_etext;
     uint32_t *data_ptr = &_sdata;
     if (init_values_ptr != data_ptr) {
@@ -194,10 +197,11 @@ We then can do:
             *data_ptr++ = *init_values_ptr++;
         }
     }
-    
+```
 
-Putting it together, we can write our `Reset_Handler`
+Juntando, podemos escrever nosso `Reset_Handler`
 
+```c
     void Reset_Handler(void)
     {
         /* Copy init values from text to data */
@@ -215,10 +219,11 @@ Putting it together, we can write our `Reset_Handler`
             *bss_ptr++ = 0;
         }
     }
-    
+```
 
-We still need to start our program! That’s achieved with a simple call to `main()`.
+Ainda precisamos começar nosso programa! Isso é conseguido com uma simples chamada para `main()`.
 
+```c
     void Reset_Handler(void)
     {
         /* Copy init values from text to data */
@@ -245,30 +250,28 @@ We still need to start our program! That’s achieved with a simple call to `mai
         /* Infinite loop */
         while (1);
     }
-    
+```
 
-You will note that we added two things:
+Você notará que adicionamos duas coisas:
 
-1.  An infinite loop after `main()`, so we do not run off into the weeds if the main function returns
-2.  Workaround for chip bugs which are best taken care of before our program starts. Sometimes these are wrapped in a `SystemInit` function called by the `Reset_Handler` before `main`. This is the approach [taken by Nordic](https://github.com/NordicSemiconductor/nrfx/blob/6f54f689e9555ea18f9aca87caf44a3419e5dd7a/mdk/system_nrf52811.c#L60).
+1. Um loop infinito depois de `main()`, para não corrermos para as ervas daninhas se a função principal retornar
+2. Solução alternativa para bugs de chip que devem ser resolvidos antes do início do nosso programa. Algumas vezes estes são encapsulados em uma função `SystemInit` chamada pelo `Reset_Handler` antes de `main`. Esta é a abordagem [tomada pela Nordic](https://github.com/NordicSemiconductor/nrfx/blob/6f54f689e9555ea18f9aca87caf44a3419e5dd7a/mdk/system_nrf52811.c#L60).
 
-Closing[](#closing)
--------------------
+# Conclusão
+-----------
 
-All the code used in this blog post is available on [Github](https://github.com/memfault/zero-to-main/tree/master/minimal).
+Todo o código usado nesta postagem do blog está disponível no [Github](https://github.com/memfault/zero-to-main/tree/master/minimal).
 
-See anything you'd like to change? Submit a pull request or open an issue at [GitHub](https://github.com/memfault/interrupt)
+Vê algo que você gostaria de mudar? Envie um pull request ou abra um problema no [GitHub](https://github.com/memfault/interrupt)
 
-More complex programs often require a more complicated `Reset_Handler`. For example:
+Programas mais complexos geralmente requerem um `Reset_Handler` mais complicado. Por exemplo:
 
-1.  Relocatable code must be copied over
-2.  If our program relies on libc, we must initialize it  
-    _EDIT: Post written!_ - [From Zero to main(): Bootstrapping libc with Newlib](/blog/boostrapping-libc-with-newlib)
-3.  More complex memory layouts can add a few copy / zero loops
+1. O código realocável deve ser copiado
+2. Se nosso programa depende de libc, devemos inicializá-lo
+     _EDIT: Post escrito!_ - [From Zero to main(): Bootstrapping libc with Newlib](/blog/boostrapping-libc-with-newlib)
+3. Layouts de memória mais complexos podem adicionar alguns loops de cópia/zero
 
-We’ll cover all of them in future posts. But before that, we’ll talk about how the magical memory region variables come about, how our `Reset_Handler`’s address ends up at `0x00000004`, and how to write a linker script in our next post!
-
-_EDIT: Post written!_ - [From Zero to main(): Demystifying Firmware Linker Scripts](/blog/how-to-write-linker-scripts-for-firmware)
+Abordaremos todos eles em posts futuros. Mas antes disso, falaremos sobre como surgem as variáveis mágicas da região de memória, como o endereço do nosso `Reset_Handler` termina em `0x00000004` e como escrever um script de linker em nosso próximo post!
 
 ![](/img/author/francois.jpg) [François Baldassari](/authors/francois) has worked on the embedded software teams at Sun, Pebble, and Oculus. He is currently the CEO of [Memfault](https://memfault.com).  
 [](https://twitter.com/baldassarifr)[](https://www.linkedin.com/in/francois-baldassari)[](https://github.com/franc0is)
